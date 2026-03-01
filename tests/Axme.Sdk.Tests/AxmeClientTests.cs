@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
 using Axme.Sdk;
+using Xunit;
 
 namespace Axme.Sdk.Tests;
 
