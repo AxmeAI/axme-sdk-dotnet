@@ -55,3 +55,13 @@ var updated = await client.UpdateUserProfileAsync(
 ```bash
 dotnet test tests/Axme.Sdk.Tests/Axme.Sdk.Tests.csproj
 ```
+
+## Enterprise Admin APIs
+
+.NET SDK now includes service-account lifecycle helpers:
+
+- `CreateServiceAccountAsync`
+- `ListServiceAccountsAsync`
+- `GetServiceAccountAsync`
+- `CreateServiceAccountKeyAsync`
+- `RevokeServiceAccountKeyAsync`
