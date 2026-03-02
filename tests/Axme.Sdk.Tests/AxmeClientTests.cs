@@ -89,6 +89,50 @@ public sealed class AxmeClientTests
         Assert.Equal("Partner User Updated", response["display_name"]!.GetValue<string>());
     }
 
+    [Fact]
+    public async Task ServiceAccountLifecycleEndpoints_AreReachable()
+    {
+        var call = 0;
+        var handler = new StubHttpMessageHandler(
+            _ =>
+            {
+                call += 1;
+                return call switch
+                {
+                    1 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"service_account":{"service_account_id":"sa_123"}}"""),
+                    2 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"service_accounts":[{"service_account_id":"sa_123"}]}"""),
+                    3 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"service_account":{"service_account_id":"sa_123"}}"""),
+                    4 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"key":{"key_id":"sak_123","status":"active"}}"""),
+                    _ => JsonResponse(HttpStatusCode.OK, """{"ok":true,"key":{"key_id":"sak_123","status":"revoked"}}"""),
+                };
+            });
+        var client = BuildClient(handler);
+
+        await client.CreateServiceAccountAsync(
+            new JsonObject
+            {
+                ["org_id"] = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                ["workspace_id"] = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                ["name"] = "sdk-runner",
+                ["created_by_actor_id"] = "actor_dotnet",
+            });
+        Assert.Equal("/v1/service-accounts", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.ListServiceAccountsAsync(
+            "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+        Assert.Equal("/v1/service-accounts", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.GetServiceAccountAsync("sa_123");
+        Assert.Equal("/v1/service-accounts/sa_123", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.CreateServiceAccountKeyAsync("sa_123", new JsonObject { ["created_by_actor_id"] = "actor_dotnet" });
+        Assert.Equal("/v1/service-accounts/sa_123/keys", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.RevokeServiceAccountKeyAsync("sa_123", "sak_123");
+        Assert.Equal("/v1/service-accounts/sa_123/keys/sak_123/revoke", handler.LastRequest!.RequestUri!.AbsolutePath);
+    }
+
     private static AxmeClient BuildClient(StubHttpMessageHandler handler)
     {
         var httpClient = new HttpClient(handler);

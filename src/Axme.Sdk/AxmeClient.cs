@@ -86,6 +86,73 @@ public sealed class AxmeClient
             options: options,
             cancellationToken: cancellationToken);
 
+    public Task<JsonObject> CreateServiceAccountAsync(
+        JsonObject payload,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => RequestJsonAsync(
+            HttpMethod.Post,
+            "/v1/service-accounts",
+            query: null,
+            payload: payload,
+            options: options,
+            cancellationToken: cancellationToken);
+
+    public Task<JsonObject> ListServiceAccountsAsync(
+        string orgId,
+        string? workspaceId = null,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => RequestJsonAsync(
+            HttpMethod.Get,
+            "/v1/service-accounts",
+            query: new Dictionary<string, string>
+            {
+                ["org_id"] = orgId,
+                ["workspace_id"] = workspaceId ?? string.Empty,
+            },
+            payload: null,
+            options: options,
+            cancellationToken: cancellationToken);
+
+    public Task<JsonObject> GetServiceAccountAsync(
+        string serviceAccountId,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => RequestJsonAsync(
+            HttpMethod.Get,
+            $"/v1/service-accounts/{serviceAccountId}",
+            query: null,
+            payload: null,
+            options: options,
+            cancellationToken: cancellationToken);
+
+    public Task<JsonObject> CreateServiceAccountKeyAsync(
+        string serviceAccountId,
+        JsonObject payload,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => RequestJsonAsync(
+            HttpMethod.Post,
+            $"/v1/service-accounts/{serviceAccountId}/keys",
+            query: null,
+            payload: payload,
+            options: options,
+            cancellationToken: cancellationToken);
+
+    public Task<JsonObject> RevokeServiceAccountKeyAsync(
+        string serviceAccountId,
+        string keyId,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => RequestJsonAsync(
+            HttpMethod.Post,
+            $"/v1/service-accounts/{serviceAccountId}/keys/{keyId}/revoke",
+            query: null,
+            payload: null,
+            options: options,
+            cancellationToken: cancellationToken);
+
     private async Task<JsonObject> RequestJsonAsync(
         HttpMethod method,
         string path,
