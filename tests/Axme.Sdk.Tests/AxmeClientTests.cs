@@ -238,6 +238,210 @@ public sealed class AxmeClientTests
         Assert.Equal("?owner_agent=agent%3A%2F%2Fcreator", handler.LastRequest!.RequestUri.Query);
     }
 
+    [Fact]
+    public async Task AccessAliasInboxInviteMediaSchemaWebhookEndpoints_AreReachable()
+    {
+        var call = 0;
+        var handler = new StubHttpMessageHandler(
+            _ =>
+            {
+                call += 1;
+                return call switch
+                {
+                    1 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"access_request_id":"ar_123"}"""),
+                    2 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"items":[]}"""),
+                    3 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"access_request":{"access_request_id":"ar_123"}}"""),
+                    4 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"state":"approved"}"""),
+                    5 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"alias_id":"al_123"}"""),
+                    6 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"items":[]}"""),
+                    7 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"target":"agent://support"}"""),
+                    8 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"revoked":true}"""),
+                    9 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"decision":"approve"}"""),
+                    10 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"capabilities":["intent.submit"]}"""),
+                    11 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"threads":[]}"""),
+                    12 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"thread_id":"thread_123"}"""),
+                    13 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"changes":[],"next_cursor":"cur-2"}"""),
+                    14 => JsonResponse(HttpStatusCode.OK, """{"ok":true}"""),
+                    15 => JsonResponse(HttpStatusCode.OK, """{"ok":true}"""),
+                    16 => JsonResponse(HttpStatusCode.OK, """{"ok":true}"""),
+                    17 => JsonResponse(HttpStatusCode.OK, """{"ok":true}"""),
+                    18 => JsonResponse(HttpStatusCode.OK, """{"ok":true}"""),
+                    19 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"token":"tok_123"}"""),
+                    20 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"token":"tok_123"}"""),
+                    21 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"accepted":true}"""),
+                    22 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"upload_id":"up_123"}"""),
+                    23 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"upload_id":"up_123"}"""),
+                    24 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"status":"finalized"}"""),
+                    25 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"semantic_type":"notify.message.v1"}"""),
+                    26 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"semantic_type":"notify.message.v1"}"""),
+                    27 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"subscription_id":"wh_sub_123"}"""),
+                    28 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"items":[]}"""),
+                    29 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"deleted":true}"""),
+                    30 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"event_id":"evt_123"}"""),
+                    _ => JsonResponse(HttpStatusCode.OK, """{"ok":true,"replayed":true}"""),
+                };
+            });
+        var client = BuildClient(handler);
+
+        await client.CreateAccessRequestAsync(new JsonObject { ["owner_agent"] = "agent://owner" }, new RequestOptions { IdempotencyKey = "ar-create-1" });
+        Assert.Equal("/v1/access-requests", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ListAccessRequestsAsync("org_1", "ws_1", "pending");
+        Assert.Equal("/v1/access-requests", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetAccessRequestAsync("ar_123");
+        Assert.Equal("/v1/access-requests/ar_123", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ReviewAccessRequestAsync("ar_123", new JsonObject { ["decision"] = "approve" }, new RequestOptions { IdempotencyKey = "ar-review-1" });
+        Assert.Equal("/v1/access-requests/ar_123/review", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.BindAliasAsync(new JsonObject { ["alias"] = "@support", ["target_agent"] = "agent://support" });
+        Assert.Equal("/v1/aliases", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ListAliasesAsync("org_1", "ws_1");
+        Assert.Equal("/v1/aliases", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ResolveAliasAsync("org_1", "ws_1", "@support");
+        Assert.Equal("/v1/aliases/resolve", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.RevokeAliasAsync("al_123");
+        Assert.Equal("/v1/aliases/al_123/revoke", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.DecideApprovalAsync("ap_123", new JsonObject { ["decision"] = "approve" });
+        Assert.Equal("/v1/approvals/ap_123/decision", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetCapabilitiesAsync();
+        Assert.Equal("/v1/capabilities", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.ListInboxAsync("agent://owner");
+        Assert.Equal("/v1/inbox", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetInboxThreadAsync("thread_123", "agent://owner");
+        Assert.Equal("/v1/inbox/thread_123", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ListInboxChangesAsync("agent://owner", "cur-1", 50);
+        Assert.Equal("/v1/inbox/changes", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ReplyInboxThreadAsync("thread_123", "ack", "agent://owner", new RequestOptions { IdempotencyKey = "reply-1" });
+        Assert.Equal("/v1/inbox/thread_123/reply", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.DelegateInboxThreadAsync("thread_123", new JsonObject { ["delegate_to"] = "agent://delegate" }, "agent://owner");
+        Assert.Equal("/v1/inbox/thread_123/delegate", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ApproveInboxThreadAsync("thread_123", new JsonObject { ["comment"] = "approved" }, "agent://owner");
+        Assert.Equal("/v1/inbox/thread_123/approve", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.RejectInboxThreadAsync("thread_123", new JsonObject { ["comment"] = "reject" }, "agent://owner");
+        Assert.Equal("/v1/inbox/thread_123/reject", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.DeleteInboxMessagesAsync("thread_123", new JsonObject { ["message_ids"] = new JsonArray("m1", "m2") }, "agent://owner");
+        Assert.Equal("/v1/inbox/thread_123/messages/delete", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.CreateInviteAsync(new JsonObject { ["owner_agent"] = "agent://owner" });
+        Assert.Equal("/v1/invites/create", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetInviteAsync("tok_123");
+        Assert.Equal("/v1/invites/tok_123", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.AcceptInviteAsync("tok_123", new JsonObject { ["owner_agent"] = "agent://owner" });
+        Assert.Equal("/v1/invites/tok_123/accept", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.CreateMediaUploadAsync(new JsonObject { ["owner_agent"] = "agent://owner" });
+        Assert.Equal("/v1/media/create-upload", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetMediaUploadAsync("up_123");
+        Assert.Equal("/v1/media/up_123", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.FinalizeMediaUploadAsync(new JsonObject { ["upload_id"] = "up_123" });
+        Assert.Equal("/v1/media/finalize-upload", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.UpsertSchemaAsync(new JsonObject { ["semantic_type"] = "notify.message.v1", ["schema"] = new JsonObject { ["type"] = "object" } });
+        Assert.Equal("/v1/schemas", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetSchemaAsync("notify.message.v1");
+        Assert.Equal("/v1/schemas/notify.message.v1", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.UpsertWebhookSubscriptionAsync(
+            new JsonObject
+            {
+                ["owner_agent"] = "agent://owner",
+                ["callback_url"] = "https://example.com/hook",
+                ["event_types"] = new JsonArray("inbox.thread_created"),
+            });
+        Assert.Equal("/v1/webhooks/subscriptions", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ListWebhookSubscriptionsAsync("agent://owner");
+        Assert.Equal("/v1/webhooks/subscriptions", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.DeleteWebhookSubscriptionAsync("wh_sub_123", "agent://owner");
+        Assert.Equal("/v1/webhooks/subscriptions/wh_sub_123", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.PublishWebhookEventAsync(
+            new JsonObject { ["event_type"] = "inbox.thread_created", ["payload"] = new JsonObject { ["thread_id"] = "thr_1" } },
+            "agent://owner");
+        Assert.Equal("/v1/webhooks/events", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ReplayWebhookEventAsync("evt_123", "agent://owner");
+        Assert.Equal("/v1/webhooks/events/evt_123/replay", handler.LastRequest!.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task OrganizationRoutingDeliveryAndBillingEndpoints_AreReachable()
+    {
+        var call = 0;
+        var handler = new StubHttpMessageHandler(
+            _ =>
+            {
+                call += 1;
+                return JsonResponse(HttpStatusCode.OK, """{"ok":true}""");
+            });
+        var client = BuildClient(handler);
+
+        await client.CreateOrganizationAsync(new JsonObject { ["org_id"] = "org_1", ["name"] = "Acme" });
+        Assert.Equal("/v1/organizations", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetOrganizationAsync("org_1");
+        Assert.Equal("/v1/organizations/org_1", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.UpdateOrganizationAsync("org_1", new JsonObject { ["display_name"] = "Acme Inc" });
+        Assert.Equal("/v1/organizations/org_1", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.CreateWorkspaceAsync("org_1", new JsonObject { ["workspace_id"] = "ws_1", ["name"] = "Primary" });
+        Assert.Equal("/v1/organizations/org_1/workspaces", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ListWorkspacesAsync("org_1");
+        Assert.Equal("/v1/organizations/org_1/workspaces", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.UpdateWorkspaceAsync("org_1", "ws_1", new JsonObject { ["name"] = "Primary Updated" });
+        Assert.Equal("/v1/organizations/org_1/workspaces/ws_1", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ListOrganizationMembersAsync("org_1", "ws_1");
+        Assert.Equal("/v1/organizations/org_1/members", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.AddOrganizationMemberAsync("org_1", new JsonObject { ["owner_agent"] = "agent://owner", ["role"] = "workspace_admin" });
+        Assert.Equal("/v1/organizations/org_1/members", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.UpdateOrganizationMemberAsync("org_1", "member_1", new JsonObject { ["role"] = "workspace_viewer" });
+        Assert.Equal("/v1/organizations/org_1/members/member_1", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.RemoveOrganizationMemberAsync("org_1", "member_1");
+        Assert.Equal("/v1/organizations/org_1/members/member_1", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.UpdateQuotaAsync(new JsonObject { ["org_id"] = "org_1", ["workspace_id"] = "ws_1", ["hard_enforce"] = true });
+        Assert.Equal("/v1/quotas", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetQuotaAsync("org_1", "ws_1");
+        Assert.Equal("/v1/quotas", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetUsageSummaryAsync("org_1", "ws_1", "30d");
+        Assert.Equal("/v1/usage/summary", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetUsageTimeseriesAsync("org_1", "ws_1", 7);
+        Assert.Equal("/v1/usage/timeseries", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.CreatePrincipalAsync(new JsonObject { ["owner_agent"] = "agent://owner", ["kind"] = "service" });
+        Assert.Equal("/v1/principals", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetPrincipalAsync("pr_1");
+        Assert.Equal("/v1/principals/pr_1", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.RegisterRoutingEndpointAsync(new JsonObject { ["org_id"] = "org_1", ["workspace_id"] = "ws_1", ["transport"] = "http" });
+        Assert.Equal("/v1/routing/endpoints", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ListRoutingEndpointsAsync("org_1", "ws_1");
+        Assert.Equal("/v1/routing/endpoints", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.UpdateRoutingEndpointAsync("route_1", new JsonObject { ["weight"] = 10 });
+        Assert.Equal("/v1/routing/endpoints/route_1", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.RemoveRoutingEndpointAsync("route_1");
+        Assert.Equal("/v1/routing/endpoints/route_1", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ResolveRoutingAsync(new JsonObject { ["org_id"] = "org_1", ["workspace_id"] = "ws_1", ["semantic_type"] = "notify.message.v1" });
+        Assert.Equal("/v1/routing/resolve", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.UpsertTransportBindingAsync(new JsonObject { ["org_id"] = "org_1", ["workspace_id"] = "ws_1", ["transport"] = "http" });
+        Assert.Equal("/v1/transports/bindings", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ListTransportBindingsAsync("org_1", "ws_1");
+        Assert.Equal("/v1/transports/bindings", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.RemoveTransportBindingAsync("binding_1");
+        Assert.Equal("/v1/transports/bindings/binding_1", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.SubmitDeliveryAsync(new JsonObject { ["org_id"] = "org_1", ["workspace_id"] = "ws_1", ["principal_id"] = "pr_1" });
+        Assert.Equal("/v1/deliveries", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ListDeliveriesAsync("org_1", "ws_1", "pr_1", "pending");
+        Assert.Equal("/v1/deliveries", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetDeliveryAsync("delivery_1");
+        Assert.Equal("/v1/deliveries/delivery_1", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ReplayDeliveryAsync("delivery_1");
+        Assert.Equal("/v1/deliveries/delivery_1/replay", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.UpdateBillingPlanAsync(new JsonObject { ["org_id"] = "org_1", ["workspace_id"] = "ws_1", ["plan"] = "enterprise" });
+        Assert.Equal("/v1/billing/plan", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetBillingPlanAsync("org_1", "ws_1");
+        Assert.Equal("/v1/billing/plan", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.ListBillingInvoicesAsync("org_1", "ws_1", "open");
+        Assert.Equal("/v1/billing/invoices", handler.LastRequest!.RequestUri!.AbsolutePath);
+        await client.GetBillingInvoiceAsync("inv_1");
+        Assert.Equal("/v1/billing/invoices/inv_1", handler.LastRequest!.RequestUri!.AbsolutePath);
+    }
+
     private static AxmeClient BuildClient(StubHttpMessageHandler handler)
     {
         var httpClient = new HttpClient(handler);
