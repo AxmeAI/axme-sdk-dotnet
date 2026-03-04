@@ -133,6 +133,111 @@ public sealed class AxmeClientTests
         Assert.Equal("/v1/service-accounts/sa_123/keys/sak_123/revoke", handler.LastRequest!.RequestUri!.AbsolutePath);
     }
 
+    [Fact]
+    public async Task IntentLifecycleAndControlEndpoints_AreReachable()
+    {
+        var call = 0;
+        var handler = new StubHttpMessageHandler(
+            _ =>
+            {
+                call += 1;
+                return call switch
+                {
+                    1 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"intent_id":"it_123"}"""),
+                    2 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"intent":{"intent_id":"it_123"}}"""),
+                    3 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"events":[]}"""),
+                    4 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"applied":false,"policy_generation":4}"""),
+                    5 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"applied":true}"""),
+                    6 => JsonResponse(HttpStatusCode.OK, """{"ok":true,"applied":true,"policy_generation":5}"""),
+                    _ => JsonResponse(HttpStatusCode.OK, """{"ok":true,"applied":true,"policy_generation":6}"""),
+                };
+            });
+        var client = BuildClient(handler);
+
+        await client.CreateIntentAsync(
+            new JsonObject
+            {
+                ["intent_type"] = "notify.message.v1",
+                ["from_agent"] = "agent://self",
+                ["to_agent"] = "agent://target",
+                ["payload"] = new JsonObject { ["text"] = "hello" },
+            });
+        Assert.Equal("/v1/intents", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.GetIntentAsync("it_123");
+        Assert.Equal("/v1/intents/it_123", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.ListIntentEventsAsync("it_123", since: 2);
+        Assert.Equal("/v1/intents/it_123/events", handler.LastRequest!.RequestUri!.AbsolutePath);
+        Assert.Equal("?since=2", handler.LastRequest!.RequestUri.Query);
+
+        await client.ResolveIntentAsync(
+            "it_123",
+            new JsonObject
+            {
+                ["status"] = "COMPLETED",
+                ["expected_policy_generation"] = 3,
+            },
+            new RequestOptions
+            {
+                OwnerAgent = "agent://owner",
+                XOwnerAgent = "agent://owner",
+                Authorization = "Bearer scoped-token",
+                TraceId = "trace-1",
+            });
+        Assert.Equal("/v1/intents/it_123/resolve", handler.LastRequest!.RequestUri!.AbsolutePath);
+        Assert.Equal("?owner_agent=agent%3A%2F%2Fowner", handler.LastRequest!.RequestUri.Query);
+        Assert.Contains("Bearer scoped-token", handler.LastRequest.Headers.GetValues("Authorization"));
+        Assert.Contains("agent://owner", handler.LastRequest.Headers.GetValues("x-owner-agent"));
+        Assert.Contains("trace-1", handler.LastRequest.Headers.GetValues("X-Trace-Id"));
+
+        await client.ResumeIntentAsync(
+            "it_123",
+            new JsonObject
+            {
+                ["approve_current_step"] = true,
+                ["expected_policy_generation"] = 2,
+            },
+            new RequestOptions
+            {
+                OwnerAgent = "agent://owner",
+                IdempotencyKey = "resume-1",
+            });
+        Assert.Equal("/v1/intents/it_123/resume", handler.LastRequest!.RequestUri!.AbsolutePath);
+        Assert.Equal("?owner_agent=agent%3A%2F%2Fowner", handler.LastRequest!.RequestUri.Query);
+        Assert.Contains("resume-1", handler.LastRequest.Headers.GetValues("Idempotency-Key"));
+
+        await client.UpdateIntentControlsAsync(
+            "it_123",
+            new JsonObject
+            {
+                ["controls_patch"] = new JsonObject { ["timeout_seconds"] = 120 },
+                ["expected_policy_generation"] = 5,
+            });
+        Assert.Equal("/v1/intents/it_123/controls", handler.LastRequest!.RequestUri!.AbsolutePath);
+
+        await client.UpdateIntentPolicyAsync(
+            "it_123",
+            new JsonObject
+            {
+                ["grants_patch"] = new JsonObject
+                {
+                    ["delegate:agent://ops"] = new JsonObject
+                    {
+                        ["allow"] = new JsonArray("resume", "update_controls"),
+                    },
+                },
+                ["envelope_patch"] = new JsonObject { ["max_retry_count"] = 10 },
+                ["expected_policy_generation"] = 5,
+            },
+            new RequestOptions
+            {
+                OwnerAgent = "agent://creator",
+            });
+        Assert.Equal("/v1/intents/it_123/policy", handler.LastRequest!.RequestUri!.AbsolutePath);
+        Assert.Equal("?owner_agent=agent%3A%2F%2Fcreator", handler.LastRequest!.RequestUri.Query);
+    }
+
     private static AxmeClient BuildClient(StubHttpMessageHandler handler)
     {
         var httpClient = new HttpClient(handler);
