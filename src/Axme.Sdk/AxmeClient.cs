@@ -153,6 +153,103 @@ public sealed class AxmeClient
             options: options,
             cancellationToken: cancellationToken);
 
+    public Task<JsonObject> CreateIntentAsync(
+        JsonObject payload,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => RequestJsonAsync(
+            HttpMethod.Post,
+            "/v1/intents",
+            query: null,
+            payload: payload,
+            options: options,
+            cancellationToken: cancellationToken);
+
+    public Task<JsonObject> GetIntentAsync(
+        string intentId,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => RequestJsonAsync(
+            HttpMethod.Get,
+            $"/v1/intents/{intentId}",
+            query: null,
+            payload: null,
+            options: options,
+            cancellationToken: cancellationToken);
+
+    public Task<JsonObject> ListIntentEventsAsync(
+        string intentId,
+        int? since = null,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new Dictionary<string, string>();
+        if (since is int sinceValue && sinceValue >= 0)
+        {
+            query["since"] = sinceValue.ToString();
+        }
+
+        return RequestJsonAsync(
+            HttpMethod.Get,
+            $"/v1/intents/{intentId}/events",
+            query: query,
+            payload: null,
+            options: options,
+            cancellationToken: cancellationToken);
+    }
+
+    public Task<JsonObject> ResolveIntentAsync(
+        string intentId,
+        JsonObject payload,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => RequestJsonAsync(
+            HttpMethod.Post,
+            $"/v1/intents/{intentId}/resolve",
+            query: BuildIntentControlQuery(options),
+            payload: payload,
+            options: options,
+            cancellationToken: cancellationToken);
+
+    public Task<JsonObject> ResumeIntentAsync(
+        string intentId,
+        JsonObject payload,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => RequestJsonAsync(
+            HttpMethod.Post,
+            $"/v1/intents/{intentId}/resume",
+            query: BuildIntentControlQuery(options),
+            payload: payload,
+            options: options,
+            cancellationToken: cancellationToken);
+
+    public Task<JsonObject> UpdateIntentControlsAsync(
+        string intentId,
+        JsonObject payload,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => RequestJsonAsync(
+            HttpMethod.Post,
+            $"/v1/intents/{intentId}/controls",
+            query: BuildIntentControlQuery(options),
+            payload: payload,
+            options: options,
+            cancellationToken: cancellationToken);
+
+    public Task<JsonObject> UpdateIntentPolicyAsync(
+        string intentId,
+        JsonObject payload,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => RequestJsonAsync(
+            HttpMethod.Post,
+            $"/v1/intents/{intentId}/policy",
+            query: BuildIntentControlQuery(options),
+            payload: payload,
+            options: options,
+            cancellationToken: cancellationToken);
+
     private async Task<JsonObject> RequestJsonAsync(
         HttpMethod method,
         string path,
@@ -162,7 +259,14 @@ public sealed class AxmeClient
         CancellationToken cancellationToken)
     {
         var request = new HttpRequestMessage(method, BuildUrl(path, query));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+        if (!string.IsNullOrWhiteSpace(options?.Authorization))
+        {
+            request.Headers.TryAddWithoutValidation("Authorization", options.Authorization);
+        }
+        else
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+        }
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
         if (!string.IsNullOrWhiteSpace(options?.IdempotencyKey))
@@ -172,6 +276,10 @@ public sealed class AxmeClient
         if (!string.IsNullOrWhiteSpace(options?.TraceId))
         {
             request.Headers.TryAddWithoutValidation("X-Trace-Id", options.TraceId);
+        }
+        if (!string.IsNullOrWhiteSpace(options?.XOwnerAgent))
+        {
+            request.Headers.TryAddWithoutValidation("x-owner-agent", options.XOwnerAgent);
         }
         if (payload is not null)
         {
@@ -220,5 +328,15 @@ public sealed class AxmeClient
         }
 
         return $"{_baseUrl}{path}?{string.Join("&", parts)}";
+    }
+
+    private static Dictionary<string, string>? BuildIntentControlQuery(RequestOptions? options)
+    {
+        if (string.IsNullOrWhiteSpace(options?.OwnerAgent))
+        {
+            return null;
+        }
+
+        return new Dictionary<string, string> { ["owner_agent"] = options.OwnerAgent! };
     }
 }
