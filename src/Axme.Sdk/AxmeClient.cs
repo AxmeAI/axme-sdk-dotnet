@@ -8,6 +8,7 @@ public sealed class AxmeClient
 {
     private readonly string _baseUrl;
     private readonly string _apiKey;
+    private readonly string? _actorToken;
     private readonly HttpClient _httpClient;
 
     public AxmeClient(AxmeClientConfig config, HttpClient? httpClient = null)
@@ -20,9 +21,18 @@ public sealed class AxmeClient
         {
             throw new ArgumentException("ApiKey is required", nameof(config));
         }
+        var actorToken = string.IsNullOrWhiteSpace(config.ActorToken) ? null : config.ActorToken.Trim();
+        var bearerToken = string.IsNullOrWhiteSpace(config.BearerToken) ? null : config.BearerToken.Trim();
+        if (!string.IsNullOrWhiteSpace(actorToken)
+            && !string.IsNullOrWhiteSpace(bearerToken)
+            && !string.Equals(actorToken, bearerToken, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("ActorToken and BearerToken must match when both are provided", nameof(config));
+        }
 
         _baseUrl = config.BaseUrl.TrimEnd('/');
         _apiKey = config.ApiKey.Trim();
+        _actorToken = actorToken ?? bearerToken;
         _httpClient = httpClient ?? new HttpClient();
     }
 
@@ -894,13 +904,14 @@ public sealed class AxmeClient
         CancellationToken cancellationToken)
     {
         var request = new HttpRequestMessage(method, BuildUrl(path, query));
+        request.Headers.TryAddWithoutValidation("x-api-key", _apiKey);
         if (!string.IsNullOrWhiteSpace(options?.Authorization))
         {
             request.Headers.TryAddWithoutValidation("Authorization", options.Authorization);
         }
-        else
+        else if (!string.IsNullOrWhiteSpace(_actorToken))
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _actorToken);
         }
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
