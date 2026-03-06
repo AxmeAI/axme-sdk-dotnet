@@ -1,0 +1,30 @@
+name: publish-nuget
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Run tests
+        run: dotnet test tests/Axme.Sdk.Tests/Axme.Sdk.Tests.csproj -v minimal
+
+      - name: Pack NuGet package
+        run: dotnet pack src/Axme.Sdk/Axme.Sdk.csproj -c Release -o artifacts/nuget
+
+      - name: Publish to NuGet
+        run: dotnet nuget push "artifacts/nuget/Axme.*.nupkg" --source "https://api.nuget.org/v3/index.json" --api-key "${{ secrets.NUGET_API_KEY }}" --skip-duplicate
