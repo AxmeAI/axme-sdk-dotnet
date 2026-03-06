@@ -20,7 +20,7 @@
 ## Install
 
 ```bash
-dotnet add package Axme.Sdk --prerelease
+dotnet add package Axme
 ```
 
 ---
