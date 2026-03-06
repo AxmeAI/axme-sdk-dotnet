@@ -20,13 +20,48 @@ public sealed class AxmeClientTests
             new RequestOptions { IdempotencyKey = "register-1" });
 
         Assert.Equal("/v1/users/register-nick", handler.LastRequest!.RequestUri!.AbsolutePath);
-        Assert.Equal("Bearer", handler.LastRequest.Headers.Authorization?.Scheme);
-        Assert.Equal("token", handler.LastRequest.Headers.Authorization?.Parameter);
+        Assert.Contains("token", handler.LastRequest.Headers.GetValues("x-api-key"));
         Assert.Contains("register-1", handler.LastRequest.Headers.GetValues("Idempotency-Key"));
 
         var body = JsonNode.Parse(await handler.LastRequest.Content!.ReadAsStringAsync())!.AsObject();
         Assert.Equal("@partner.user", body["nick"]!.GetValue<string>());
         Assert.True(response["ok"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task ClientSendsConfiguredActorToken()
+    {
+        var handler = new StubHttpMessageHandler(
+            _ => JsonResponse(HttpStatusCode.OK, """{"ok":true,"available":true}"""));
+
+        var actorClient = new AxmeClient(
+            new AxmeClientConfig
+            {
+                BaseUrl = "https://api.axme.test",
+                ApiKey = "platform-token",
+                ActorToken = "actor-token",
+            },
+            new HttpClient(handler));
+
+        await actorClient.CheckNickAsync("@partner.user");
+
+        Assert.Contains("platform-token", handler.LastRequest!.Headers.GetValues("x-api-key"));
+        Assert.Equal("Bearer", handler.LastRequest.Headers.Authorization?.Scheme);
+        Assert.Equal("actor-token", handler.LastRequest.Headers.Authorization?.Parameter);
+    }
+
+    [Fact]
+    public void ConfigRejectsConflictingActorTokenAliases()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new AxmeClient(
+                new AxmeClientConfig
+                {
+                    BaseUrl = "https://api.axme.test",
+                    ApiKey = "platform-token",
+                    ActorToken = "actor-a",
+                    BearerToken = "actor-b",
+                }));
     }
 
     [Fact]
