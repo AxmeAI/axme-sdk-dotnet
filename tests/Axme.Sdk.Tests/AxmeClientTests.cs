@@ -65,6 +65,27 @@ public sealed class AxmeClientTests
     }
 
     [Fact]
+    public async Task ConfigUsesDefaultBaseUrlWhenMissing()
+    {
+        var handler = new StubHttpMessageHandler(
+            request =>
+            {
+                Assert.Equal("https://api.cloud.axme.ai/health", request.RequestUri!.ToString());
+                return JsonResponse(HttpStatusCode.OK, """{"ok":true}""");
+            });
+
+        var client = new AxmeClient(
+            new AxmeClientConfig
+            {
+                ApiKey = "token",
+            },
+            new HttpClient(handler));
+
+        var response = await client.HealthAsync();
+        Assert.True(response["ok"]!.GetValue<bool>());
+    }
+
+    [Fact]
     public async Task CheckNickAsync_SendsQueryParameter()
     {
         var handler = new StubHttpMessageHandler(
