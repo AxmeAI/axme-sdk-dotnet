@@ -6,6 +6,7 @@ namespace Axme.Sdk;
 
 public sealed class AxmeClient
 {
+    private const string DefaultBaseUrl = "https://api.cloud.axme.ai";
     private readonly string _baseUrl;
     private readonly string _apiKey;
     private readonly string? _actorToken;
@@ -13,10 +14,6 @@ public sealed class AxmeClient
 
     public AxmeClient(AxmeClientConfig config, HttpClient? httpClient = null)
     {
-        if (string.IsNullOrWhiteSpace(config.BaseUrl))
-        {
-            throw new ArgumentException("BaseUrl is required", nameof(config));
-        }
         if (string.IsNullOrWhiteSpace(config.ApiKey))
         {
             throw new ArgumentException("ApiKey is required", nameof(config));
@@ -30,7 +27,8 @@ public sealed class AxmeClient
             throw new ArgumentException("ActorToken and BearerToken must match when both are provided", nameof(config));
         }
 
-        _baseUrl = config.BaseUrl.TrimEnd('/');
+        var normalizedBaseUrl = string.IsNullOrWhiteSpace(config.BaseUrl) ? DefaultBaseUrl : config.BaseUrl.Trim();
+        _baseUrl = normalizedBaseUrl.TrimEnd('/');
         _apiKey = config.ApiKey.Trim();
         _actorToken = actorToken ?? bearerToken;
         _httpClient = httpClient ?? new HttpClient();

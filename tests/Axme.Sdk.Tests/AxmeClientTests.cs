@@ -65,6 +65,27 @@ public sealed class AxmeClientTests
     }
 
     [Fact]
+    public async Task ConfigUsesDefaultBaseUrlWhenMissing()
+    {
+        var handler = new StubHttpMessageHandler(
+            request =>
+            {
+                Assert.Equal("https://api.cloud.axme.ai/v1/capabilities", request.RequestUri!.ToString());
+                return JsonResponse(HttpStatusCode.OK, """{"runtime":"cloud"}""");
+            });
+
+        var client = new AxmeClient(
+            new AxmeClientConfig
+            {
+                ApiKey = "token",
+            },
+            new HttpClient(handler));
+
+        var response = await client.GetCapabilitiesAsync();
+        Assert.Equal("cloud", response["runtime"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task CheckNickAsync_SendsQueryParameter()
     {
         var handler = new StubHttpMessageHandler(

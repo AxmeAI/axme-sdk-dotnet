@@ -70,9 +70,10 @@ using Axme.Sdk;
 
 var client = new AxmeClient(new AxmeClientConfig
 {
-    BaseUrl = "https://gateway.axme.ai",
-    ApiKey = "YOUR_PLATFORM_API_KEY", // sent as x-api-key
+    ApiKey = "AXME_API_KEY", // sent as x-api-key
     ActorToken = "OPTIONAL_USER_OR_SESSION_TOKEN", // sent as Authorization: Bearer
+    // Optional override (defaults to https://api.cloud.axme.ai):
+    // BaseUrl = "https://staging-api.cloud.axme.ai",
 });
 
 // Check connectivity
@@ -94,6 +95,26 @@ var intent = await client.CreateIntentAsync(
 );
 Console.WriteLine($"{intent["intent_id"]} {intent["status"]}");
 ```
+
+---
+
+## Minimal Language-Native Example
+
+Short basic submit/get example:
+
+- [`examples/BasicSubmit.cs`](examples/BasicSubmit.cs)
+
+Run:
+
+```bash
+export AXME_API_KEY="axme_sa_..."
+# use examples/BasicSubmit.cs inside your app project (or script host)
+```
+
+Full runnable scenario set lives in:
+
+- Cloud: <https://github.com/AxmeAI/axme-examples/tree/main/cloud>
+- Protocol-only: <https://github.com/AxmeAI/axme-examples/tree/main/protocol>
 
 ---
 
@@ -217,6 +238,8 @@ axme-sdk-dotnet/
 │   ├── RequestOptions.cs      # Idempotency key and correlation ID
 │   └── AxmeAPIException.cs    # Typed exception hierarchy
 ├── tests/Axme.Sdk.Tests/      # xUnit test suite
+├── examples/
+│   └── BasicSubmit.cs         # Minimal language-native quickstart
 └── docs/
     └── diagrams/              # Diagram copies for README embedding
 ```
