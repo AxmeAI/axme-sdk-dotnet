@@ -70,8 +70,8 @@ public sealed class AxmeClientTests
         var handler = new StubHttpMessageHandler(
             request =>
             {
-                Assert.Equal("https://api.cloud.axme.ai/health", request.RequestUri!.ToString());
-                return JsonResponse(HttpStatusCode.OK, """{"ok":true}""");
+                Assert.Equal("https://api.cloud.axme.ai/v1/capabilities", request.RequestUri!.ToString());
+                return JsonResponse(HttpStatusCode.OK, """{"runtime":"cloud"}""");
             });
 
         var client = new AxmeClient(
@@ -81,8 +81,8 @@ public sealed class AxmeClientTests
             },
             new HttpClient(handler));
 
-        var response = await client.HealthAsync();
-        Assert.True(response["ok"]!.GetValue<bool>());
+        var response = await client.GetCapabilitiesAsync();
+        Assert.Equal("cloud", response["runtime"]!.GetValue<string>());
     }
 
     [Fact]
