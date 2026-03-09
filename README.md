@@ -122,7 +122,7 @@ Full runnable scenario set lives in:
 
 The SDK covers the full public API surface:
 
-![Error Model and Retriability](docs/diagrams/02-error-model-retriability.svg)
+![Error Model and Retriability](https://raw.githubusercontent.com/AxmeAI/axme-docs/main/docs/diagrams/api/02-error-model-retriability.svg)
 
 *`4xx` client errors throw `AxmeClientException` — do not retry. `5xx` server errors throw `AxmeServerException` — safe to retry with the original idempotency key. The `RetryAfter` property provides the wait hint.*
 
@@ -144,7 +144,7 @@ while (page["cursor"] != null)
 }
 ```
 
-![Pagination, Filtering, and Sorting Patterns](docs/diagrams/03-pagination-filtering-sorting-patterns.svg)
+![Pagination, Filtering, and Sorting Patterns](https://raw.githubusercontent.com/AxmeAI/axme-docs/main/docs/diagrams/api/03-pagination-filtering-sorting-patterns.svg)
 
 *All list methods return a `cursor` field. Pass it as `after` in subsequent calls. The SDK does not buffer pages — you control the iteration.*
 
@@ -241,7 +241,6 @@ axme-sdk-dotnet/
 ├── examples/
 │   └── BasicSubmit.cs         # Minimal language-native quickstart
 └── docs/
-    └── diagrams/              # Diagram copies for README embedding
 ```
 
 ---
