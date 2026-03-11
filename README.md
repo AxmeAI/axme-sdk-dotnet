@@ -79,21 +79,25 @@ var client = new AxmeClient(new AxmeClientConfig
 // Check connectivity
 Console.WriteLine(await client.HealthAsync());
 
-// Send an intent
+// Send an intent to a registered agent address
 var intent = await client.CreateIntentAsync(
     new JsonObject
     {
         ["intent_type"] = "order.fulfillment.v1",
+        ["to_agent"] = "agent://acme-corp/production/fulfillment-service",
         ["payload"] = new JsonObject
         {
             ["order_id"] = "ord_123",
             ["priority"] = "high",
         },
-        ["owner_agent"] = "agent://fulfillment-service",
     },
     new RequestOptions { IdempotencyKey = "fulfill-ord-123-001" }
 );
 Console.WriteLine($"{intent["intent_id"]} {intent["status"]}");
+
+// List registered agent addresses
+var agents = await client.ListAgentsAsync("acme-corp-uuid", "prod-ws-uuid");
+Console.WriteLine(agents["agents"]);
 ```
 
 ---
