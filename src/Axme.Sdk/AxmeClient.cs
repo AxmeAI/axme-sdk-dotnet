@@ -161,6 +161,50 @@ public sealed class AxmeClient
             options: options,
             cancellationToken: cancellationToken);
 
+    public Task<JsonObject> ListAgentsAsync(
+        string orgId,
+        string workspaceId,
+        int? limit = null,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new Dictionary<string, string>
+        {
+            ["org_id"] = orgId,
+            ["workspace_id"] = workspaceId,
+        };
+        if (limit.HasValue && limit.Value > 0)
+        {
+            query["limit"] = limit.Value.ToString();
+        }
+        return RequestJsonAsync(
+            HttpMethod.Get,
+            "/v1/agents",
+            query: query,
+            payload: null,
+            options: options,
+            cancellationToken: cancellationToken);
+    }
+
+    public Task<JsonObject> GetAgentAsync(
+        string address,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var pathPart = address.TrimStart();
+        if (pathPart.StartsWith("agent://", StringComparison.Ordinal))
+        {
+            pathPart = pathPart["agent://".Length..];
+        }
+        return RequestJsonAsync(
+            HttpMethod.Get,
+            $"/v1/agents/{pathPart}",
+            query: null,
+            payload: null,
+            options: options,
+            cancellationToken: cancellationToken);
+    }
+
     public Task<JsonObject> CreateIntentAsync(
         JsonObject payload,
         RequestOptions? options = null,

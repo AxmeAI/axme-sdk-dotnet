@@ -12,8 +12,7 @@ var created = await client.CreateIntentAsync(new JsonObject
 {
     ["intent_type"] = "intent.demo.v1",
     ["correlation_id"] = Guid.NewGuid().ToString(),
-    ["from_agent"] = "agent://basic/dotnet/source",
-    ["to_agent"] = "agent://basic/dotnet/target",
+    ["to_agent"] = "agent://acme-corp/production/target",
     ["payload"] = new JsonObject { ["task"] = "hello-from-dotnet" },
 });
 
