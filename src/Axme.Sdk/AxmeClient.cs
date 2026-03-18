@@ -982,7 +982,10 @@ public sealed class AxmeClient
             ["jsonrpc"] = "2.0",
             ["id"] = Guid.NewGuid().ToString(),
             ["method"] = "initialize",
-            ["params"] = new JsonObject(),
+            ["params"] = new JsonObject
+            {
+                ["protocolVersion"] = "2024-11-05",
+            },
         };
         var response = await RequestJsonAsync(HttpMethod.Post, "/mcp", null, body, options, ct).ConfigureAwait(false);
         return response["result"]?.AsObject() ?? response;
