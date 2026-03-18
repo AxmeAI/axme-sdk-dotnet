@@ -498,6 +498,180 @@ public sealed class AxmeClientTests
         Assert.Equal("/v1/billing/invoices/inv_1", handler.LastRequest!.RequestUri!.AbsolutePath);
     }
 
+    // ── ObserveAsync / WaitForAsync tests ─────────────────────────────
+
+    [Fact]
+    public async Task ObserveAsync_YieldsEventsAndStopsAtTerminal()
+    {
+        var pollCount = 0;
+        var handler = new StubHttpMessageHandler(_ =>
+        {
+            pollCount += 1;
+            return pollCount switch
+            {
+                1 => JsonResponse(HttpStatusCode.OK,
+                    """{"ok":true,"events":[{"seq":1,"event_type":"intent.created","status":"PENDING"}]}"""),
+                2 => JsonResponse(HttpStatusCode.OK,
+                    """{"ok":true,"events":[]}"""),
+                3 => JsonResponse(HttpStatusCode.OK,
+                    """{"ok":true,"events":[{"seq":2,"event_type":"intent.progress","status":"IN_PROGRESS"},{"seq":3,"event_type":"intent.completed","status":"COMPLETED"}]}"""),
+                _ => throw new InvalidOperationException("Should not poll after terminal event"),
+            };
+        });
+        var client = BuildClient(handler);
+
+        var collected = new List<JsonObject>();
+        await foreach (var evt in client.ObserveAsync("it_123", since: 0, pollIntervalSeconds: 0.01))
+        {
+            collected.Add(evt);
+        }
+
+        Assert.Equal(3, collected.Count);
+        Assert.Equal("intent.created", collected[0]["event_type"]!.GetValue<string>());
+        Assert.Equal("intent.progress", collected[1]["event_type"]!.GetValue<string>());
+        Assert.Equal("intent.completed", collected[2]["event_type"]!.GetValue<string>());
+        Assert.Equal(3, pollCount);
+    }
+
+    [Fact]
+    public async Task ObserveAsync_TracksSinceParameter()
+    {
+        var pollCount = 0;
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            pollCount += 1;
+            var query = request.RequestUri!.Query;
+            return pollCount switch
+            {
+                1 => JsonResponse(HttpStatusCode.OK,
+                    """{"ok":true,"events":[{"seq":5,"event_type":"intent.created","status":"PENDING"}]}"""),
+                2 =>
+                    // Second poll should have since=5
+                    query.Contains("since=5")
+                        ? JsonResponse(HttpStatusCode.OK,
+                            """{"ok":true,"events":[{"seq":10,"event_type":"intent.completed","status":"COMPLETED"}]}""")
+                        : throw new InvalidOperationException($"Expected since=5 but got query: {query}"),
+                _ => throw new InvalidOperationException("Should not poll after terminal"),
+            };
+        });
+        var client = BuildClient(handler);
+
+        var collected = new List<JsonObject>();
+        await foreach (var evt in client.ObserveAsync("it_123", since: 0, pollIntervalSeconds: 0.01))
+        {
+            collected.Add(evt);
+        }
+
+        Assert.Equal(2, collected.Count);
+        Assert.Equal(5, collected[0]["seq"]!.GetValue<int>());
+        Assert.Equal(10, collected[1]["seq"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task ObserveAsync_ThrowsTimeoutException()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            JsonResponse(HttpStatusCode.OK, """{"ok":true,"events":[]}"""));
+        var client = BuildClient(handler);
+
+        await Assert.ThrowsAsync<TimeoutException>(async () =>
+        {
+            await foreach (var _ in client.ObserveAsync("it_123", timeoutSeconds: 0.1, pollIntervalSeconds: 0.02))
+            {
+                // should never get here
+            }
+        });
+    }
+
+    [Fact]
+    public async Task ObserveAsync_DetectsTerminalByStatus()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            JsonResponse(HttpStatusCode.OK,
+                """{"ok":true,"events":[{"seq":1,"status":"FAILED"}]}"""));
+        var client = BuildClient(handler);
+
+        var collected = new List<JsonObject>();
+        await foreach (var evt in client.ObserveAsync("it_123", pollIntervalSeconds: 0.01))
+        {
+            collected.Add(evt);
+        }
+
+        Assert.Single(collected);
+        Assert.Equal("FAILED", collected[0]["status"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task ObserveAsync_DetectsTerminalByEventType()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            JsonResponse(HttpStatusCode.OK,
+                """{"ok":true,"events":[{"seq":1,"event_type":"intent.canceled"}]}"""));
+        var client = BuildClient(handler);
+
+        var collected = new List<JsonObject>();
+        await foreach (var evt in client.ObserveAsync("it_123", pollIntervalSeconds: 0.01))
+        {
+            collected.Add(evt);
+        }
+
+        Assert.Single(collected);
+        Assert.Equal("intent.canceled", collected[0]["event_type"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task WaitForAsync_ReturnsTerminalEvent()
+    {
+        var pollCount = 0;
+        var handler = new StubHttpMessageHandler(_ =>
+        {
+            pollCount += 1;
+            return pollCount switch
+            {
+                1 => JsonResponse(HttpStatusCode.OK,
+                    """{"ok":true,"events":[{"seq":1,"event_type":"intent.created","status":"PENDING"}]}"""),
+                2 => JsonResponse(HttpStatusCode.OK,
+                    """{"ok":true,"events":[{"seq":2,"event_type":"intent.completed","status":"COMPLETED","result":{"answer":42}}]}"""),
+                _ => throw new InvalidOperationException("Should not poll after terminal"),
+            };
+        });
+        var client = BuildClient(handler);
+
+        var terminal = await client.WaitForAsync("it_123", pollIntervalSeconds: 0.01);
+
+        Assert.Equal("COMPLETED", terminal["status"]!.GetValue<string>());
+        Assert.Equal("intent.completed", terminal["event_type"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task WaitForAsync_ThrowsTimeoutException()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            JsonResponse(HttpStatusCode.OK, """{"ok":true,"events":[]}"""));
+        var client = BuildClient(handler);
+
+        await Assert.ThrowsAsync<TimeoutException>(async () =>
+            await client.WaitForAsync("it_123", timeoutSeconds: 0.1, pollIntervalSeconds: 0.02));
+    }
+
+    [Fact]
+    public async Task ObserveAsync_DetectsTimedOutStatus()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            JsonResponse(HttpStatusCode.OK,
+                """{"ok":true,"events":[{"seq":1,"event_type":"intent.timed_out","status":"TIMED_OUT"}]}"""));
+        var client = BuildClient(handler);
+
+        var collected = new List<JsonObject>();
+        await foreach (var evt in client.ObserveAsync("it_123", pollIntervalSeconds: 0.01))
+        {
+            collected.Add(evt);
+        }
+
+        Assert.Single(collected);
+        Assert.Equal("TIMED_OUT", collected[0]["status"]!.GetValue<string>());
+    }
+
     private static AxmeClient BuildClient(StubHttpMessageHandler handler)
     {
         var httpClient = new HttpClient(handler);

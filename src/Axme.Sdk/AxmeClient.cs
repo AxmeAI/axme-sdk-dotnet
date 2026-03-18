@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json.Nodes;
 
@@ -1087,6 +1088,144 @@ public sealed class AxmeClient
 
         return parsed;
     }
+
+    // ── Poll-based observation ──────────────────────────────────────────
+
+    private static readonly HashSet<string> TerminalStatuses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "COMPLETED", "FAILED", "CANCELED", "TIMED_OUT",
+    };
+
+    private static readonly HashSet<string> TerminalEventTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "intent.completed", "intent.failed", "intent.canceled", "intent.timed_out",
+    };
+
+    private static bool IsTerminalIntentEvent(JsonObject evt)
+    {
+        var status = evt["status"]?.GetValue<string>();
+        if (status is not null && TerminalStatuses.Contains(status))
+        {
+            return true;
+        }
+
+        var eventType = evt["event_type"]?.GetValue<string>();
+        return eventType is not null && TerminalEventTypes.Contains(eventType);
+    }
+
+    private static int MaxSeenSeq(int currentMax, JsonObject evt)
+    {
+        var seqNode = evt["seq"];
+        if (seqNode is null)
+        {
+            return currentMax;
+        }
+
+        var seq = seqNode.GetValue<int>();
+        return Math.Max(currentMax, seq);
+    }
+
+    /// <summary>
+    /// Polls <see cref="ListIntentEventsAsync"/> in a loop and yields each event as it arrives.
+    /// Stops automatically when a terminal event is observed (status in COMPLETED, FAILED, CANCELED, TIMED_OUT).
+    /// </summary>
+    /// <param name="intentId">The intent to observe.</param>
+    /// <param name="since">Initial sequence number (events with seq &gt; since are returned).</param>
+    /// <param name="pollIntervalSeconds">Seconds to wait between empty polls.</param>
+    /// <param name="timeoutSeconds">Maximum wall-clock seconds before throwing <see cref="TimeoutException"/>. Null means no timeout.</param>
+    /// <param name="options">Optional request options forwarded to the underlying HTTP call.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async IAsyncEnumerable<JsonObject> ObserveAsync(
+        string intentId,
+        int since = 0,
+        double pollIntervalSeconds = 1.0,
+        double? timeoutSeconds = null,
+        RequestOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var deadline = timeoutSeconds.HasValue
+            ? DateTime.UtcNow.AddSeconds(timeoutSeconds.Value)
+            : (DateTime?)null;
+
+        var nextSince = since;
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            if (deadline.HasValue && DateTime.UtcNow >= deadline.Value)
+            {
+                throw new TimeoutException(
+                    $"ObserveAsync timed out after {timeoutSeconds} seconds for intent {intentId}");
+            }
+
+            var response = await ListIntentEventsAsync(intentId, since: nextSince, options: options, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+
+            var eventsNode = response["events"];
+            var events = eventsNode is JsonArray arr ? arr : new JsonArray();
+
+            if (events.Count == 0)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(pollIntervalSeconds), cancellationToken)
+                    .ConfigureAwait(false);
+                continue;
+            }
+
+            foreach (var node in events)
+            {
+                if (node is not JsonObject evt)
+                {
+                    continue;
+                }
+
+                nextSince = MaxSeenSeq(nextSince, evt);
+                yield return evt;
+
+                if (IsTerminalIntentEvent(evt))
+                {
+                    yield break;
+                }
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    /// <summary>
+    /// Polls until a terminal event is observed and returns it.
+    /// This is a convenience wrapper around <see cref="ObserveAsync"/> that returns only the final event.
+    /// </summary>
+    /// <param name="intentId">The intent to wait for.</param>
+    /// <param name="since">Initial sequence number.</param>
+    /// <param name="pollIntervalSeconds">Seconds between empty polls.</param>
+    /// <param name="timeoutSeconds">Maximum seconds to wait before throwing <see cref="TimeoutException"/>.</param>
+    /// <param name="options">Optional request options.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The terminal event as a <see cref="JsonObject"/>.</returns>
+    public async Task<JsonObject> WaitForAsync(
+        string intentId,
+        int since = 0,
+        double pollIntervalSeconds = 1.0,
+        double? timeoutSeconds = null,
+        RequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        JsonObject? last = null;
+        await foreach (var evt in ObserveAsync(intentId, since, pollIntervalSeconds, timeoutSeconds, options, cancellationToken)
+                            .ConfigureAwait(false))
+        {
+            last = evt;
+        }
+
+        if (last is null)
+        {
+            throw new InvalidOperationException(
+                $"ObserveAsync for intent {intentId} ended without producing any events");
+        }
+
+        return last;
+    }
+
+    // ── Private helpers ─────────────────────────────────────────────────
 
     private string BuildUrl(string path, Dictionary<string, string>? query)
     {
