@@ -937,6 +937,97 @@ public sealed class AxmeClient
         CancellationToken cancellationToken = default)
         => RequestJsonAsync(HttpMethod.Get, $"/v1/billing/invoices/{invoiceId}", null, null, options, cancellationToken);
 
+    public async Task<string> SendIntentAsync(
+        JsonObject payload,
+        RequestOptions? options = null,
+        CancellationToken ct = default)
+    {
+        var body = new JsonObject();
+        foreach (var kvp in payload)
+        {
+            body[kvp.Key] = kvp.Value?.DeepClone();
+        }
+        if (!body.ContainsKey("correlation_id") || body["correlation_id"] is null)
+        {
+            body["correlation_id"] = Guid.NewGuid().ToString();
+        }
+        var result = await CreateIntentAsync(body, options, ct).ConfigureAwait(false);
+        return result["intent_id"]?.GetValue<string>()
+            ?? throw new InvalidOperationException("response missing intent_id");
+    }
+
+    public Task<JsonObject> ApplyScenarioAsync(
+        JsonObject bundle,
+        RequestOptions? options = null,
+        CancellationToken ct = default)
+        => RequestJsonAsync(HttpMethod.Post, "/v1/scenarios/apply", null, bundle, options, ct);
+
+    public Task<JsonObject> ValidateScenarioAsync(
+        JsonObject bundle,
+        RequestOptions? options = null,
+        CancellationToken ct = default)
+        => RequestJsonAsync(HttpMethod.Post, "/v1/scenarios/validate", null, bundle, options, ct);
+
+    public Task<JsonObject> HealthAsync(
+        RequestOptions? options = null,
+        CancellationToken ct = default)
+        => RequestJsonAsync(HttpMethod.Get, "/v1/health", null, null, options, ct);
+
+    public async Task<JsonObject> McpInitializeAsync(
+        RequestOptions? options = null,
+        CancellationToken ct = default)
+    {
+        var body = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = Guid.NewGuid().ToString(),
+            ["method"] = "initialize",
+            ["params"] = new JsonObject(),
+        };
+        var response = await RequestJsonAsync(HttpMethod.Post, "/mcp", null, body, options, ct).ConfigureAwait(false);
+        return response["result"]?.AsObject() ?? response;
+    }
+
+    public async Task<JsonObject> McpListToolsAsync(
+        RequestOptions? options = null,
+        CancellationToken ct = default)
+    {
+        var body = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = Guid.NewGuid().ToString(),
+            ["method"] = "tools/list",
+            ["params"] = new JsonObject(),
+        };
+        var response = await RequestJsonAsync(HttpMethod.Post, "/mcp", null, body, options, ct).ConfigureAwait(false);
+        return response["result"]?.AsObject() ?? response;
+    }
+
+    public async Task<JsonObject> McpCallToolAsync(
+        string name,
+        JsonObject? arguments = null,
+        RequestOptions? options = null,
+        CancellationToken ct = default)
+    {
+        var mcpParams = new JsonObject
+        {
+            ["name"] = name,
+        };
+        if (arguments is not null)
+        {
+            mcpParams["arguments"] = arguments.DeepClone();
+        }
+        var body = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = Guid.NewGuid().ToString(),
+            ["method"] = "tools/call",
+            ["params"] = mcpParams,
+        };
+        var response = await RequestJsonAsync(HttpMethod.Post, "/mcp", null, body, options, ct).ConfigureAwait(false);
+        return response["result"]?.AsObject() ?? response;
+    }
+
     private async Task<JsonObject> RequestJsonAsync(
         HttpMethod method,
         string path,
