@@ -286,6 +286,34 @@ var profile = await client.GetUserProfileAsync(
 
 ---
 
+## Cross-Org Delivery Control
+
+Organizations can control which external orgs may send intents to their agents:
+
+1. **Org receive policy** — org-wide default (`open`, `allowlist`, `closed`)
+2. **Agent receive override** — per-agent exceptions to the org policy
+
+```csharp
+// Get org receive policy
+var policy = await client.GetAsync($"/v1/organizations/{orgId}/receive-policy");
+
+// Set to allowlist mode
+await client.PutAsync($"/v1/organizations/{orgId}/receive-policy", new {
+    mode = "allowlist",
+    allowlist = new[] { "org_id_of_trusted_partner" }
+});
+
+// Per-agent override
+await client.PutAsync($"/v1/agents/{address}/receive-override", new {
+    override_type = "allow",
+    source_org_id = "org_id_of_partner"
+});
+```
+
+See [`cross-org-receive-policy.md`](https://github.com/AxmeAI/axme-docs/blob/main/docs/cross-org-receive-policy.md) for the full decision flow.
+
+---
+
 ## MCP (Model Context Protocol)
 
 The .NET SDK includes a built-in MCP endpoint client for gateway-hosted MCP sessions.
