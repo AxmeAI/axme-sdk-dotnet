@@ -286,6 +286,37 @@ var profile = await client.GetUserProfileAsync(
 
 ---
 
+## MCP (Model Context Protocol)
+
+The .NET SDK includes a built-in MCP endpoint client for gateway-hosted MCP sessions.
+
+```csharp
+// Initialize an MCP session
+var init = await client.McpInitializeAsync();
+Console.WriteLine(init["serverInfo"]);
+
+// List available tools
+var tools = await client.McpListToolsAsync();
+foreach (var tool in tools["tools"]?.AsArray() ?? [])
+{
+    Console.WriteLine(tool?["name"]);
+}
+
+// Call a tool
+var arguments = new JsonObject
+{
+    ["intent_type"] = "order.fulfillment.v1",
+    ["payload"] = new JsonObject { ["order_id"] = "ord_123" },
+    ["owner_agent"] = "agent://fulfillment-service",
+};
+var result = await client.McpCallToolAsync("create_intent", arguments);
+Console.WriteLine(result);
+```
+
+By default the SDK posts to `/mcp`. Override with `McpEndpointPath` in client options.
+
+---
+
 ## Repository Structure
 
 ```
