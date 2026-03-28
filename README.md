@@ -1,6 +1,6 @@
 # axme-sdk-dotnet
 
-**.NET SDK for AXME** - send intents, listen for deliveries, resume workflows. Async/await throughout, targeting .NET 6+.
+**.NET SDK for AXME** - send intents, listen for deliveries, resume workflows. Async/await throughout, targeting .NET 8+.
 
 [![Alpha](https://img.shields.io/badge/status-alpha-orange)](https://cloud.axme.ai/alpha/cli) [![NuGet](https://img.shields.io/nuget/v/Axme)](https://www.nuget.org/packages/Axme/) [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
@@ -13,6 +13,8 @@
 ```bash
 dotnet add package Axme
 ```
+
+Requires .NET 8+.
 
 ---
 
