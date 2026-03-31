@@ -71,6 +71,19 @@ var events = await client.ListIntentEventsAsync(intentId);
 
 ---
 
+## Agent Mesh - Monitor and Govern
+
+Agent Mesh gives every agent real-time health monitoring, policy enforcement, and a kill switch - all from a single dashboard.
+
+```csharp
+client.Mesh.StartHeartbeat();
+client.Mesh.ReportMetric(new Metric { Success = true, LatencyMs = 230, CostUsd = 0.02m });
+```
+
+Set action policies (allowlist/denylist intent types) and cost policies (intents/day, $/day limits) per agent via dashboard or API. Mesh module coming soon to this SDK - [Python SDK](https://github.com/AxmeAI/axme-sdk-python) available now. [Full overview](https://github.com/AxmeAI/axme#agent-mesh---see-and-control-your-agents).
+
+---
+
 ## Examples
 
 See [`examples/BasicSubmit.cs`](examples/BasicSubmit.cs). More: [axme-examples](https://github.com/AxmeAI/axme-examples)
