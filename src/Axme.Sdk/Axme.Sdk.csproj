@@ -13,5 +13,6 @@
 
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="" />
+    <InternalsVisibleTo Include="Axme.Sdk.Tests" />
   </ItemGroup>
 </Project>

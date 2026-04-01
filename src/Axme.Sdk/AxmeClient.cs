@@ -12,6 +12,7 @@ public sealed class AxmeClient
     private readonly string _apiKey;
     private readonly string? _actorToken;
     private readonly HttpClient _httpClient;
+    private MeshClient? _mesh;
 
     public AxmeClient(AxmeClientConfig config, HttpClient? httpClient = null)
     {
@@ -34,6 +35,11 @@ public sealed class AxmeClient
         _actorToken = actorToken ?? bearerToken;
         _httpClient = httpClient ?? new HttpClient();
     }
+
+    /// <summary>
+    /// Agent Mesh operations - heartbeat, health monitoring, metrics reporting, and agent lifecycle.
+    /// </summary>
+    public MeshClient Mesh => _mesh ??= new MeshClient(this);
 
     public Task<JsonObject> RegisterNickAsync(
         JsonObject payload,
@@ -1031,6 +1037,15 @@ public sealed class AxmeClient
         var response = await RequestJsonAsync(HttpMethod.Post, "/mcp", null, body, options, ct).ConfigureAwait(false);
         return response["result"]?.AsObject() ?? response;
     }
+
+    internal Task<JsonObject> RequestJsonInternalAsync(
+        HttpMethod method,
+        string path,
+        Dictionary<string, string>? query,
+        JsonObject? payload,
+        RequestOptions? options,
+        CancellationToken cancellationToken)
+        => RequestJsonAsync(method, path, query, payload, options, cancellationToken);
 
     private async Task<JsonObject> RequestJsonAsync(
         HttpMethod method,
