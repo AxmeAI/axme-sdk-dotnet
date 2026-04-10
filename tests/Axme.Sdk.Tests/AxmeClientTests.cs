@@ -21,11 +21,22 @@ public sealed class AxmeClientTests
 
         Assert.Equal("/v1/users/register-nick", handler.LastRequest!.RequestUri!.AbsolutePath);
         Assert.Contains("token", handler.LastRequest.Headers.GetValues("x-api-key"));
+        Assert.Contains($"axme-sdk-dotnet/{AxmeClient.SdkVersion}", handler.LastRequest.Headers.GetValues("X-Axme-Client"));
         Assert.Contains("register-1", handler.LastRequest.Headers.GetValues("Idempotency-Key"));
 
         var body = JsonNode.Parse(await handler.LastRequest.Content!.ReadAsStringAsync())!.AsObject();
         Assert.Equal("@partner.user", body["nick"]!.GetValue<string>());
         Assert.True(response["ok"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task ClientSendsXAxmeClientHeader()
+    {
+        var handler = new StubHttpMessageHandler(
+            _ => JsonResponse(HttpStatusCode.OK, """{"ok":true,"available":true}"""));
+        var client = BuildClient(handler);
+        await client.CheckNickAsync("@partner.user");
+        Assert.Contains($"axme-sdk-dotnet/{AxmeClient.SdkVersion}", handler.LastRequest!.Headers.GetValues("X-Axme-Client"));
     }
 
     [Fact]

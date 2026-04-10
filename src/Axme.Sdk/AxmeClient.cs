@@ -7,6 +7,12 @@ namespace Axme.Sdk;
 
 public sealed class AxmeClient
 {
+    /// <summary>
+    /// Published axme-sdk-dotnet version. Sent in X-Axme-Client header so AXME
+    /// platform analytics can identify SDK usage. Bump on every release.
+    /// </summary>
+    public const string SdkVersion = "0.2.0";
+
     private const string DefaultBaseUrl = "https://api.cloud.axme.ai";
     private readonly string _baseUrl;
     private readonly string _apiKey;
@@ -1057,6 +1063,7 @@ public sealed class AxmeClient
     {
         var request = new HttpRequestMessage(method, BuildUrl(path, query));
         request.Headers.TryAddWithoutValidation("x-api-key", _apiKey);
+        request.Headers.TryAddWithoutValidation("X-Axme-Client", $"axme-sdk-dotnet/{SdkVersion}");
         if (!string.IsNullOrWhiteSpace(options?.Authorization))
         {
             request.Headers.TryAddWithoutValidation("Authorization", options.Authorization);
